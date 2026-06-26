@@ -4,13 +4,22 @@ import { ProductListing } from "@/components/ProductListing";
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; category?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, category } = await searchParams;
   const [categories, products] = await Promise.all([
     getCategories(),
     getProducts({ search: q }),
   ]);
 
-  return <ProductListing categories={categories} initialProducts={products} initialQuery={q ?? ""} />;
+  const initialCategoryName = categories.find((c) => c.slug === category)?.name ?? "all";
+
+  return (
+    <ProductListing
+      categories={categories}
+      initialProducts={products}
+      initialQuery={q ?? ""}
+      initialCategory={initialCategoryName}
+    />
+  );
 }

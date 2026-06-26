@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { Truck, RotateCcw, ShieldCheck, Headphones } from "lucide-react";
-import { getFeaturedProducts, getCategories, getHomeStats } from "@/lib/data";
+import { getFeaturedProducts, getCategoryPreviews, getHomeStats } from "@/lib/data";
 import { ProductCard } from "@/components/ProductCard";
 import { ContactSection } from "@/components/ContactSection";
 
 export default async function HomePage() {
-  const [featured, categories, stats] = await Promise.all([getFeaturedProducts(4), getCategories(), getHomeStats()]);
+  const [featured, categories, stats] = await Promise.all([
+    getFeaturedProducts(4),
+    getCategoryPreviews(4),
+    getHomeStats(),
+  ]);
 
   return (
     <div>
@@ -37,20 +41,16 @@ export default async function HomePage() {
             </div>
             <div className="flex gap-8 pt-2">
               <div>
-                <div className="text-xl font-bold tracking-tight">{stats.customerCount}</div>
-                <div className="text-xs text-[#999] mt-0.5">Registered customers</div>
-              </div>
-              <div>
-                <div className="text-xl font-bold tracking-tight">
-                  {stats.satisfactionRate !== null ? `${stats.satisfactionRate}%` : "New"}
-                </div>
-                <div className="text-xs text-[#999] mt-0.5">
-                  {stats.satisfactionRate !== null ? "Satisfaction rate" : "No reviews yet"}
-                </div>
-              </div>
-              <div>
                 <div className="text-xl font-bold tracking-tight">Free</div>
-                <div className="text-xs text-[#999] mt-0.5">Returns always</div>
+                <div className="text-xs text-[#999] mt-0.5">Shipping over $100</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold tracking-tight">24/7</div>
+                <div className="text-xs text-[#999] mt-0.5">Customer support</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold tracking-tight">30-Day</div>
+                <div className="text-xs text-[#999] mt-0.5">Easy returns</div>
               </div>
             </div>
           </div>
@@ -91,16 +91,25 @@ export default async function HomePage() {
       <section className="max-w-[1280px] mx-auto px-4 sm:px-6 pb-10 sm:pb-16">
         <h2 className="text-2xl sm:text-[26px] font-bold tracking-tight mb-7">Shop by category</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {categories.slice(0, 4).map((cat, i) => (
-            <Link key={cat.id} href="/products" className="relative aspect-square rounded-2xl overflow-hidden bg-[#f0ede8] group">
-              <img
-                src={`https://picsum.photos/seed/cat${i}/600/600`}
-                alt={cat.name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
+          {categories.map((cat) => (
+            <Link
+              key={cat.id}
+              href={`/products?category=${cat.slug}`}
+              className="relative aspect-square rounded-2xl overflow-hidden bg-[#f0ede8] group"
+            >
+              {cat.imgUrl ? (
+                <img
+                  src={cat.imgUrl}
+                  alt={cat.name}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full bg-[#f0ede8]" />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-5">
                 <div className="text-[17px] font-semibold text-white">{cat.name}</div>
+                <div className="text-[13px] text-white/70 mt-0.5">{cat.count} items</div>
               </div>
             </Link>
           ))}

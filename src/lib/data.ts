@@ -19,6 +19,28 @@ export async function getCategories() {
   return prisma.category.findMany({ orderBy: { name: "asc" } });
 }
 
+export async function getCategoryPreviews(take = 4) {
+  const categories = await prisma.category.findMany({
+    orderBy: { name: "asc" },
+    take,
+    include: {
+      products: {
+        include: { images: { orderBy: { position: "asc" }, take: 1 } },
+        take: 1,
+      },
+      _count: { select: { products: true } },
+    },
+  });
+
+  return categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    count: c._count.products,
+    imgUrl: c.products[0]?.images[0]?.url ?? null,
+  }));
+}
+
 export async function getProducts(opts?: {
   categorySlug?: string;
   maxPrice?: number;

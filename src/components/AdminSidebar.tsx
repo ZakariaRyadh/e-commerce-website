@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Package, ClipboardCheck, Users, BarChart3, ArrowLeft, Menu, X, Mail } from "lucide-react";
+import { LayoutGrid, Package, ClipboardCheck, Users, BarChart3, ArrowLeft, Menu, X, Mail, Tag } from "lucide-react";
 import { useState } from "react";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutGrid },
   { href: "/admin/products", label: "Products", icon: Package },
+  { href: "/admin/categories", label: "Categories", icon: Tag },
   { href: "/admin/orders", label: "Orders", icon: ClipboardCheck },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/messages", label: "Messages", icon: Mail },

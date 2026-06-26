@@ -18,12 +18,14 @@ export function ProductListing({
   categories,
   initialProducts,
   initialQuery,
+  initialCategory,
 }: {
   categories: Category[];
   initialProducts: Product[];
   initialQuery: string;
+  initialCategory?: string;
 }) {
-  const [filterCat, setFilterCat] = useState("all");
+  const [filterCat, setFilterCat] = useState(initialCategory ?? "all");
   const [maxPrice, setMaxPrice] = useState(300);
   const [minRating, setMinRating] = useState(0);
   const [sortBy, setSortBy] = useState("popular");
