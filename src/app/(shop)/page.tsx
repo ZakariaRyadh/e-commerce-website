@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Truck, RotateCcw, ShieldCheck, Headphones } from "lucide-react";
-import { getFeaturedProducts, getCategories } from "@/lib/data";
+import { getFeaturedProducts, getCategories, getHomeStats } from "@/lib/data";
 import { ProductCard } from "@/components/ProductCard";
+import { ContactSection } from "@/components/ContactSection";
 
 export default async function HomePage() {
-  const [featured, categories] = await Promise.all([getFeaturedProducts(4), getCategories()]);
+  const [featured, categories, stats] = await Promise.all([getFeaturedProducts(4), getCategories(), getHomeStats()]);
 
   return (
     <div>
@@ -36,12 +37,16 @@ export default async function HomePage() {
             </div>
             <div className="flex gap-8 pt-2">
               <div>
-                <div className="text-xl font-bold tracking-tight">12k+</div>
-                <div className="text-xs text-[#999] mt-0.5">Happy customers</div>
+                <div className="text-xl font-bold tracking-tight">{stats.customerCount}</div>
+                <div className="text-xs text-[#999] mt-0.5">Registered customers</div>
               </div>
               <div>
-                <div className="text-xl font-bold tracking-tight">98%</div>
-                <div className="text-xs text-[#999] mt-0.5">Satisfaction rate</div>
+                <div className="text-xl font-bold tracking-tight">
+                  {stats.satisfactionRate !== null ? `${stats.satisfactionRate}%` : "New"}
+                </div>
+                <div className="text-xs text-[#999] mt-0.5">
+                  {stats.satisfactionRate !== null ? "Satisfaction rate" : "No reviews yet"}
+                </div>
               </div>
               <div>
                 <div className="text-xl font-bold tracking-tight">Free</div>
@@ -51,11 +56,13 @@ export default async function HomePage() {
           </div>
           <div className="relative aspect-4/5 rounded-2xl overflow-hidden bg-[#f0ede8] order-1 lg:order-2">
             <img src="https://picsum.photos/seed/luma_hero/800/1000" alt="Hero" className="w-full h-full object-cover" />
-            {featured[0] && (
+            {stats.bestSeller && (
               <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 bg-white/95 backdrop-blur-sm rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 shadow-xl">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[#aaa] mb-1">Best Seller</div>
-                <div className="text-sm font-semibold">{featured[0].name}</div>
-                <div className="text-[17px] font-bold text-[#1B4FD8] mt-1">${Number(featured[0].price).toFixed(0)}</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#aaa] mb-1">
+                  {stats.bestSeller.basedOnSales ? "Best Seller" : "Top Rated"}
+                </div>
+                <div className="text-sm font-semibold">{stats.bestSeller.name}</div>
+                <div className="text-[17px] font-bold text-[#1B4FD8] mt-1">${stats.bestSeller.price.toFixed(0)}</div>
               </div>
             )}
           </div>
@@ -122,27 +129,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Newsletter */}
-      <section className="py-16 sm:py-20 px-4 sm:px-6">
-        <div className="max-w-[480px] mx-auto text-center flex flex-col items-center gap-4">
-          <span className="text-[11px] font-bold tracking-widest text-[#aaa] uppercase">Newsletter</span>
-          <h2 className="text-[28px] sm:text-[32px] font-bold tracking-tight leading-tight">Stay in the loop.</h2>
-          <p className="text-[15px] text-[#777] leading-relaxed">
-            Be first to know about new collections, exclusive offers, and style picks.
-          </p>
-          <form className="flex w-full max-w-[420px] bg-white border-[1.5px] border-[#e5e5e5] rounded-xl overflow-hidden shadow-sm">
-            <input
-              type="email"
-              placeholder="Enter your email address"
-              className="flex-1 px-4 py-3.5 text-sm outline-none min-w-0"
-            />
-            <button type="submit" className="px-5 bg-[#111] text-white text-sm font-medium shrink-0 hover:bg-[#333] cursor-pointer">
-              Subscribe
-            </button>
-          </form>
-          <p className="text-xs text-[#ccc]">No spam. Unsubscribe anytime.</p>
-        </div>
-      </section>
+      <ContactSection />
     </div>
   );
 }

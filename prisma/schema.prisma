@@ -15,10 +15,21 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum StockStatus {
   IN_STOCK
   LOW_STOCK
   SOLD_OUT
+}
+
+enum ContactStatus {
+  NEW
+  READ
+  RESOLVED
 }
 
 enum OrderStatus {
@@ -37,6 +48,7 @@ model User {
   firstName    String
   lastName     String
   role         Role      @default(CUSTOMER)
+  status       UserStatus @default(ACTIVE)
   createdAt    DateTime  @default(now())
 
   orders    Order[]
@@ -145,4 +157,13 @@ model OrderItem {
   qty       Int
   size      String?
   color     String?
+}
+
+model ContactMessage {
+  id        String        @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  status    ContactStatus @default(NEW)
+  createdAt DateTime      @default(now())
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Package, ClipboardCheck, Users, BarChart3, ArrowLeft, Menu, X } from "lucide-react";
+import { LayoutGrid, Package, ClipboardCheck, Users, BarChart3, ArrowLeft, Menu, X, Mail } from "lucide-react";
 import { useState } from "react";
 
 const NAV = [
@@ -10,6 +10,7 @@ const NAV = [
   { href: "/admin/products", label: "Products", icon: Package },
   { href: "/admin/orders", label: "Orders", icon: ClipboardCheck },
   { href: "/admin/customers", label: "Customers", icon: Users },
+  { href: "/admin/messages", label: "Messages", icon: Mail },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
 ];
 

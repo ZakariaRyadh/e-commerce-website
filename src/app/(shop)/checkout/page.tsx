@@ -216,11 +216,15 @@ export default function CheckoutPage() {
                 <div className="bg-[#f9f9f8] rounded-xl p-4 flex flex-col gap-2.5">
                   <div className="flex justify-between text-[13px]">
                     <span className="text-[#888]">Ship to</span>
-                    <span className="font-medium">123 Main St, New York NY 10001</span>
+                    <span className="font-medium">
+                      {address.street
+                        ? `${address.street}, ${address.city} ${address.state} ${address.zip}`
+                        : "123 Main St, New York NY 10001 (placeholder — fill shipping form)"}
+                    </span>
                   </div>
                   <div className="flex justify-between text-[13px]">
                     <span className="text-[#888]">Payment</span>
-                    <span className="font-medium">Card •••• 3456</span>
+                    <span className="font-medium">Card (not charged — billing not yet enabled)</span>
                   </div>
                   <div className="flex justify-between text-[13px]">
                     <span className="text-[#888]">Delivery</span>
