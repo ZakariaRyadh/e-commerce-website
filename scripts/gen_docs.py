@@ -271,9 +271,21 @@ story.append(codebox(
     "}"
 ))
 story.append(Paragraph(
-    "Decimal, not Float, for money. Floating point can't represent $19.99 exactly, and repeated "
-    "arithmetic on floats drifts — Prisma's Decimal(10,2) stores money as fixed-point, the same way a "
-    "real ledger would.", body))
+    "Decimal, not Float, for money. Floating point can't represent $19.99 exactly — IEEE 754 doubles "
+    "store it as something like 19.989999999999998, and once you start adding tax, shipping, and "
+    "discounts on top, those tiny errors compound into a total that's off by a cent in a way that's "
+    "genuinely hard to track down later. Prisma's <font face=\"Courier\">Decimal(10, 2)</font> tells "
+    "Postgres to store the value as exact fixed-point (10 total digits, 2 after the decimal point) — "
+    "the same representation a real accounting ledger uses, where $19.99 is stored as the integer 1999 "
+    "internally and the decimal point is just a display convention. The trade-off is that a "
+    "Decimal isn't a plain JavaScript number once it reaches your code — Section 10.1 is a real bug "
+    "that came directly from forgetting that distinction.", body))
+story.append(Paragraph(
+    "The other deliberate choice here is making <font face=\"Courier\">badge</font> a plain optional "
+    "string (\"New\", \"Sale\", or null) rather than an enum. An enum would force every badge to be one "
+    "of a fixed set decided at schema-design time; a free string lets the admin type any short label "
+    "without a migration, at the cost of no database-level guarantee against typos. For a label that's "
+    "purely cosmetic and never queried or filtered on, that trade favors flexibility.", body))
 story.append(Paragraph("Step 2 — Why stock moved out of Product and into its own table", h3))
 story.append(Paragraph(
     "The first version had <font face=\"Courier\">stock Int</font> directly on Product, plus "
@@ -294,7 +306,17 @@ story.append(codebox(
 story.append(Paragraph(
     "Every size/color combination is now its own row with its own stock count. The unique constraint "
     "on (productId, size, color) means the database itself refuses a duplicate combo — that's not a "
-    "rule enforced only in application code, it can never be violated even by a bug.", body))
+    "rule enforced only in application code, it can never be violated even by a bug. Concretely: if two "
+    "requests somehow both tried to insert a \"Medium / Black\" row for the same product at the same "
+    "instant (a race condition, or a retried request after a timeout), Postgres rejects the second "
+    "insert with a constraint-violation error rather than silently creating two rows that would then "
+    "both try to track the same physical inventory independently.", body))
+story.append(Paragraph(
+    "Notice what this table does <i>not</i> have: a single global stock count for the whole product. "
+    "Anywhere the storefront needs to know \"is this product in stock,\" the real answer is computed "
+    "by summing every variant's stock (see the stockFields() helper in src/lib/data.ts) — there is no "
+    "second, separately-maintained total that could ever drift out of sync with the variant rows, "
+    "because it's never stored, only derived on read.", body))
 story.append(Paragraph("Step 3 — Orders, decoupled from live product data", h3))
 story.append(codebox(
     "model Order {\n"
@@ -327,7 +349,19 @@ story.append(Paragraph(
     "OrderItem.name and .price are deliberately copied at order time, not looked up live through the "
     "relation. If the admin renames a product or changes its price next week, a customer's receipt "
     "from last month must still show what they actually paid for what they actually bought — a "
-    "snapshot, not a live join, is what makes order history historically accurate.", body))
+    "snapshot, not a live join, is what makes order history historically accurate. This is the same "
+    "principle accountants call a \"point-in-time record\": an invoice is a fact about what happened at "
+    "the moment of sale, and it must never silently change just because the thing it refers to changed "
+    "later. The OrderItem still keeps productId as a foreign key too — that's for navigation (\"show me "
+    "this product's page\") and analytics (\"how many of this exact product have sold\"), a completely "
+    "separate concern from \"what did this receipt say.\"", body))
+story.append(Paragraph(
+    "size and color on OrderItem are plain optional strings, not foreign keys to ProductVariant. This "
+    "is deliberate for the same reason as the snapshot fields above: if the admin later deletes that "
+    "exact variant row (say, discontinuing \"XS / Navy\"), the historical order line for a customer who "
+    "bought it last month must still display \"XS / Navy\" correctly — a foreign key to a row that no "
+    "longer exists would either block the deletion or null itself out, neither of which is what a "
+    "receipt should do.", body))
 story.append(Paragraph("Step 4 — Reviews, with a real uniqueness rule", h3))
 story.append(codebox(
     "model Review {\n"
@@ -372,6 +406,18 @@ story.append(Paragraph(
     "without it, every file save would create a brand-new PrismaClient (and a brand-new connection "
     "pool) without closing the old one, exhausting the database's connection limit within minutes of "
     "active development.", body))
+story.append(Paragraph(
+    "Walking through why each piece is there: <font face=\"Courier\">global as unknown as { prisma: "
+    "PrismaClient }</font> is a type-cast, not a runtime operation — TypeScript's global object isn't "
+    "typed to have a prisma property by default, so this just tells the compiler \"trust me, treat this "
+    "as having one.\" <font face=\"Courier\">PrismaPg</font> is the driver adapter that lets Prisma talk "
+    "to Postgres over a plain <font face=\"Courier\">pg</font> connection pool instead of Prisma's own "
+    "bundled query engine binary — this matters for serverless deployments (like Vercel), where "
+    "spinning up a heavyweight native binary on every cold start is slow and the adapter pattern avoids "
+    "it entirely. The <font face=\"Courier\">if (process.env.NODE_ENV !== \"production\")</font> guard "
+    "is what scopes the global-caching trick to development only — in a real production deployment, "
+    "each server instance should get exactly one client for its whole lifetime anyway, so there's no "
+    "hot-reload problem to work around and no reason to pollute the global object there.", body))
 story.append(Paragraph("Step 2 — Every read query lives in one file", h3))
 story.append(Paragraph(
     "<font face=\"Courier\">src/lib/data.ts</font> exports every function the storefront uses to read "
@@ -407,6 +453,29 @@ story.append(Paragraph(
     "Throwing inside a Prisma $transaction callback rolls back every write made so far in that "
     "callback automatically — if item 3 of 5 is out of stock, items 1 and 2 never actually get "
     "decremented either, even though their stock checks passed.", body))
+story.append(Paragraph(
+    "Walking through why it's structured as two separate loops rather than one combined "
+    "check-then-decrement loop: doing all the checks first, then all the decrements second, means the "
+    "transaction never partially decrements stock before discovering a later item is unavailable. If "
+    "checking and decrementing were interleaved per item, a 5-item order that fails on item 3 would "
+    "already have decremented items 1 and 2's stock by the time the failure is detected — and although "
+    "the transaction rollback would still undo that, structuring it as two passes makes the intent "
+    "obvious just from reading the code, rather than relying on the reader to trust that rollback "
+    "semantics will save you.", body))
+story.append(Paragraph(
+    "The error is thrown as a plain <font face=\"Courier\">Error</font> with the reason encoded in the "
+    "message string (<font face=\"Courier\">INSUFFICIENT_STOCK:productName</font>) rather than a "
+    "custom error class, then parsed back out in the route handler's catch block. This is a pragmatic "
+    "shortcut rather than the most type-safe option — a dedicated error class with a "
+    "<font face=\"Courier\">.code</font> and <font face=\"Courier\">.productName</font> property would "
+    "be cleaner to consume, but for a single call site that immediately re-parses its own thrown "
+    "string, the simpler approach was judged not worth the extra abstraction.", body))
+story.append(Paragraph(
+    "Why <font face=\"Courier\">findFirst</font> rather than a compound-key lookup: Prisma's generated "
+    "<font face=\"Courier\">@@unique([productId, size, color])</font> constraint does produce a "
+    "compound-key find method, but it requires all three fields to be passed as a single nested object "
+    "in an exact shape — using findFirst with a plain where clause reads more naturally here and "
+    "behaves identically given the uniqueness guarantee from Section 4.", body))
 story.append(Paragraph("Step 4 — Admin endpoints reuse the same shape, plus a role check", h3))
 story.append(codebox(
     "async function requireAdmin() {\n"
@@ -450,6 +519,24 @@ story.append(Paragraph(
     "Every actual login still goes through auth.ts's full Credentials provider, which does the real "
     "database lookup and password check — middleware only ever reads the already-issued JWT's role "
     "claim, it never touches the database itself.", body))
+story.append(Paragraph(
+    "It's worth being precise about why this split is necessary rather than just convenient: the Edge "
+    "runtime is a deliberately restricted JavaScript environment (closer to what runs inside a CDN "
+    "edge worker than to full Node.js) — it has no filesystem, no native TCP sockets, and crucially no "
+    "support for the native binary that Prisma's default query engine ships as. The "
+    "<font face=\"Courier\">@prisma/adapter-pg</font> driver adapter from Section 5 sidesteps the "
+    "native-binary problem for normal Node.js routes, but the underlying <font face=\"Courier\">pg"
+    "</font> package itself still depends on Node's <font face=\"Courier\">net</font> module for raw "
+    "TCP, which Edge doesn't provide either — so even with the adapter, Prisma genuinely cannot run "
+    "inside middleware. The two-file split isn't a workaround for a Prisma limitation that might be "
+    "fixed later; it's a reflection of two different runtimes with two different capability sets, and "
+    "the architecture has to respect that boundary.", body))
+story.append(Paragraph(
+    "<font face=\"Courier\">authConfig</font> is spread into the full config with "
+    "<font face=\"Courier\">...authConfig</font> rather than duplicated, so the JWT/session callbacks "
+    "(which decide what ends up in <font face=\"Courier\">req.auth.user.role</font>) are written "
+    "exactly once and shared by both the Edge-safe config and the full Node.js config — there is no "
+    "second copy that could quietly drift out of sync with the first.", body))
 story.append(Paragraph("Step 2 — The route gate itself", h3))
 story.append(codebox(
     "export default auth((req) => {\n"
@@ -480,6 +567,15 @@ story.append(codebox(
     "}"
 ))
 story.append(Paragraph(
+    "codeHash is the password-equivalent treatment for a one-time code: bcrypt-hashed at rest, with "
+    "usedAt as a nullable timestamp that turns a code from \"valid once\" into \"permanently spent\" the "
+    "instant it succeeds — there is no separate boolean and timestamp pair to keep in sync, the "
+    "presence of usedAt is the single source of truth for whether this exact code can ever be used "
+    "again. expiresAt is computed and stored once at creation time (now + 10 minutes), not recalculated "
+    "from createdAt on every check — a tiny redundancy (it could be derived from createdAt plus a "
+    "constant) that buys the ability to change the expiry window per-code in the future without a "
+    "migration, and makes the validity check itself a single, obvious comparison.", body))
+story.append(Paragraph(
     "POST /api/auth/forgot-password generates a random 6-digit code, hashes it with bcrypt (exactly "
     "like a password — never store a verification code in plaintext), sets a 10-minute expiry, and "
     "always returns the same success response whether or not the email exists:", body))
@@ -501,6 +597,32 @@ story.append(Paragraph(
     "unexpired, unused OTP for that user (not just the latest one — a user might request a code twice "
     "and use the first email that arrives), then updates the password and marks that OTP used inside a "
     "transaction, so a code can never be replayed.", body))
+story.append(codebox(
+    "const otps = await prisma.passwordResetOtp.findMany({\n"
+    "  where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },\n"
+    "  orderBy: { createdAt: \"desc\" },\n"
+    "});\n\n"
+    "let matched = null;\n"
+    "for (const otp of otps) {\n"
+    "  if (await bcrypt.compare(submittedCode, otp.codeHash)) { matched = otp; break; }\n"
+    "}\n"
+    "if (!matched) return NextResponse.json({ error: \"Invalid or expired code\" }, { status: 400 });\n\n"
+    "await prisma.$transaction([\n"
+    "  prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(newPassword, 10) } }),\n"
+    "  prisma.passwordResetOtp.update({ where: { id: matched.id }, data: { usedAt: new Date() } }),\n"
+    "]);"
+))
+story.append(Paragraph(
+    "Two details worth slowing down on. First, the loop compares the submitted code against every "
+    "still-valid OTP for the user, not just a single lookup by code value — because the code itself "
+    "is never stored in plaintext (only its bcrypt hash), there's no way to query "
+    "\"find the row where the code equals X\" directly; the only correct way to check a hash is to ask "
+    "bcrypt to compare it, one candidate at a time, the exact same pattern used for password login "
+    "itself. Second, the final write is a two-statement array passed to "
+    "<font face=\"Courier\">$transaction</font> rather than a single nested write, specifically so the "
+    "password update and the \"mark this code used\" update either both succeed or both fail together "
+    "— a crash between the two would otherwise leave a user with a changed password but a "
+    "still-technically-valid, reusable code sitting in the database.", body))
 story.append(okbox("Tested live", "Wrong code → 400 rejected. Correct code → 200, password changed. "
                                    "Old password immediately stopped working. New password worked on "
                                    "the very next login attempt."))
@@ -522,6 +644,22 @@ story.append(codebox(
     "  return { allowed: true };\n"
     "}"
 ))
+story.append(Paragraph(
+    "This is a \"fixed window\" limiter, the simplest of the standard rate-limiting algorithms: each "
+    "key gets a counter and a reset timestamp; once that timestamp passes, the counter restarts from "
+    "zero rather than gradually draining. The trade-off against a more sophisticated \"sliding window\" "
+    "or \"token bucket\" algorithm is a known edge case — a client could send its full limit right "
+    "before a window boundary, then immediately send a second full limit right after, getting roughly "
+    "double the intended rate over that boundary moment. For the actual usage here (stopping casual "
+    "brute-forcing and spam, not defending a payment endpoint against a sophisticated attacker), that "
+    "edge case is an acceptable trade for an implementation that fits in fifteen lines with zero "
+    "external dependencies.", body))
+story.append(Paragraph(
+    "Each protected route calls this with a different key prefix and limit — for example "
+    "<font face=\"Courier\">rateLimit(`signup:${ip}`, 5, 60 * 60 * 1000)</font> allows 5 signups per "
+    "hour per IP, while the OTP endpoints use a tighter window. Prefixing the key by both the action "
+    "name and the IP means one bucket per (action, IP) pair — a single IP hammering the contact form "
+    "doesn't burn through its separate signup allowance, and vice versa.", body))
 story.append(notebox("Scaling note", "This in-memory limiter resets on server restart and doesn't share "
                                       "state across multiple server instances. Fine for a single-server "
                                       "deployment; swap for a shared store (e.g. Upstash Redis) once "
@@ -623,6 +761,25 @@ story.append(codebox(
     "  return { sent: true };\n"
     "}"
 ))
+story.append(Paragraph(
+    "Notice that <font face=\"Courier\">send()</font> never throws on its own — even the real-provider "
+    "branch's <font face=\"Courier\">await client.emails.send(...)</font> is wrapped in a try/catch at "
+    "the call site (omitted above for brevity) that logs and returns <font face=\"Courier\">{ sent: "
+    "false }</font> on failure rather than letting the error propagate. This is a deliberate decision "
+    "about failure priority: a failed email send should never be the reason an order placement, a "
+    "signup, or a password reset request fails for the user — the database write that actually matters "
+    "(the order, the account, the OTP record) has already succeeded by the time the email send is "
+    "attempted, and a transient email-provider outage shouldn't roll that back or surface as an error "
+    "to someone who successfully completed the action they came to do.", body))
+story.append(Paragraph(
+    "getClient() (not shown above) does the actual environment check: it reads "
+    "<font face=\"Courier\">process.env.RESEND_API_KEY</font> and returns <font face=\"Courier\">null"
+    "</font> if it's unset or empty, returning a real Resend SDK instance otherwise. Every exported "
+    "email function (sendOrderConfirmationEmail, sendContactReceivedEmail, etc.) is a thin wrapper that "
+    "builds the HTML string for that specific email and calls this one shared send() — the HTML-string "
+    "templates are the only thing that differs between them, so adding a fifth email type later is "
+    "purely a matter of writing a new template function, not touching any of the actual sending, "
+    "fallback, or error-handling logic.", body))
 story.append(Paragraph("Four emails are wired today:", h3))
 story.append(bullets([
     "Order confirmation — sent to the customer right after a successful checkout",
@@ -657,6 +814,24 @@ story.append(codebox(
     "}"
 ))
 story.append(Paragraph(
+    "Why this is a generic function with a constrained type parameter rather than a hardcoded "
+    "<font face=\"Courier\">Product</font>-shaped function: every product query in src/lib/data.ts "
+    "returns a slightly different shape depending on which Prisma relations it includes (some include "
+    "reviews, some include variants, some include both) — a generic constrained to only the two fields "
+    "this function actually touches (<font face=\"Courier\">{ price: unknown; compareAtPrice: unknown "
+    "}</font>) lets every one of those differently-shaped query results pass through the same fix "
+    "without needing a separate overload per shape, while <font face=\"Courier\">...p</font> preserves "
+    "every other field on the object untouched.", body))
+story.append(Paragraph(
+    "The fix being a single function called from one place (the data layer) rather than patched "
+    "at each individual crash site is the actual lesson here, not just the Number() conversion itself "
+    "— the bug initially surfaced on three separate pages (home, listing, product cards) because all "
+    "three were independently passing Prisma's raw Decimal through to a client component. Patching "
+    "each one separately would have left a fourth, not-yet-discovered call site with the exact same "
+    "bug waiting to happen; centralizing the conversion at the boundary between \"data layer\" and "
+    "\"everything else\" means it's now structurally impossible for a Decimal to leak out, no matter "
+    "how many new pages call these functions later.", body))
+story.append(Paragraph(
     "General lesson: anything a database driver hands back that isn't a plain string/number/boolean/"
     "array/object (Decimal, Date in some contexts, BigInt) needs an explicit conversion at the data "
     "boundary, before it ever reaches a client component — convert once, in the data layer, not "
@@ -672,6 +847,29 @@ story.append(Paragraph(
     "Development mode silently skips this check; a production build enforces it, and nothing in the "
     "default config explicitly told it localhost (or the real deploy domain) was trusted.", body))
 story.append(codebox("export const authConfig: NextAuthConfig = {\n  trustHost: true,\n  // ...\n};"))
+story.append(Paragraph(
+    "Why this check exists at all — it isn't NextAuth being arbitrarily strict. NextAuth derives the "
+    "callback/redirect URLs it generates partly from the incoming request's Host header, because that's "
+    "genuinely the only way for the same code to work correctly across local development, a staging "
+    "subdomain, and a production domain without hardcoding any of them. But blindly trusting a "
+    "client-supplied header is also exactly how a class of \"host header injection\" attacks works — a "
+    "malicious request claiming to be from evil.com could otherwise trick the library into generating "
+    "redirect URLs pointing at an attacker's domain. NextAuth's actual design intent is "
+    "<font face=\"Courier\">trustHost</font> should be explicitly set true only once you've deployed "
+    "behind infrastructure (like Vercel, or your own reverse proxy) that you know rewrites or validates "
+    "that header before it reaches your app — which is true for essentially every standard hosting "
+    "setup, hence it being safe to set unconditionally here, but it is not something the library "
+    "should ever assume silently on your behalf.", body))
+story.append(Paragraph(
+    "The asymmetry between dev and a production build is what made this hard to catch by normal local "
+    "testing: <font face=\"Courier\">npm run dev</font> runs with <font face=\"Courier\">NODE_ENV"
+    "</font> implicitly set to \"development\", where NextAuth relaxes this check automatically as a "
+    "developer convenience — so the exact same login flow that had been manually tested dozens of "
+    "times throughout the build process worked every single time in dev, and only failed the first time "
+    "it ran under the stricter production code path, which is precisely why a full "
+    "<font face=\"Courier\">npm run build &amp;&amp; npm run start</font> smoke test became a required "
+    "step before considering any auth-related feature actually finished, not just \"working on my "
+    "machine.\"", body))
 story.append(Paragraph(
     "General lesson: \"works in dev\" is not the same claim as \"works in production\" for anything "
     "that branches on NODE_ENV — and auth/security libraries branch on it more than most. Always run a "
