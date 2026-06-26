@@ -40,7 +40,8 @@ h3 = ParagraphStyle('h3', parent=styles['Heading3'], fontName='Helvetica-Bold', 
 body = ParagraphStyle('body', parent=styles['BodyText'], fontName='Helvetica', fontSize=9.7, textColor=DARK, leading=14, spaceAfter=4)
 small = ParagraphStyle('small', parent=body, fontSize=9, textColor=GREY, leading=12.5)
 bullet = ParagraphStyle('bullet', parent=body, fontSize=9.7, textColor=DARK, leading=13.5, leftIndent=4)
-code = ParagraphStyle('code', parent=body, fontName='Courier', fontSize=7.8, textColor=CODE_FG, leading=11)
+code = ParagraphStyle('code', parent=body, fontName='Courier', fontSize=7.8, textColor=CODE_FG, leading=11,
+                       backColor=CODE_BG, borderPadding=(8, 10, 8, 10))
 note = ParagraphStyle('note', parent=body, fontSize=9.3, textColor=AMBER_TX, leading=12.5)
 ok = ParagraphStyle('ok', parent=body, fontSize=9.3, textColor=GREEN_TX, leading=12.5)
 toc_item = ParagraphStyle('toc', parent=body, fontSize=10.2, textColor=DARK, leading=15.5)
