@@ -102,7 +102,8 @@ export function AdminCategoriesClient() {
       {error && <p className="text-[13px] text-red-600">{error}</p>}
 
       <div className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden max-w-xl">
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto">
+        <table className="w-full border-collapse min-w-[420px]">
           <thead>
             <tr className="bg-[#fafafa] border-b border-[#e5e5e5]">
               <th className="px-5 py-2.5 text-left text-[11px] font-bold text-[#aaa] uppercase tracking-wider">Name</th>
@@ -172,6 +173,7 @@ export function AdminCategoriesClient() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
