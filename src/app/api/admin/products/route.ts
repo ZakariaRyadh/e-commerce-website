@@ -45,6 +45,9 @@ export async function POST(req: Request) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
+  // New products start with a single "One Size / Default" variant holding the
+  // initial stock count. Admin can add real size/color variants afterward
+  // from the product's variant manager.
   const product = await prisma.product.create({
     data: {
       name,
@@ -52,12 +55,9 @@ export async function POST(req: Request) {
       description,
       price,
       compareAtPrice,
-      stock,
-      stockStatus: stock === 0 ? "SOLD_OUT" : stock <= 5 ? "LOW_STOCK" : "IN_STOCK",
       categoryId,
-      colors: [],
-      sizes: [],
       images: { create: [{ url: `https://picsum.photos/seed/${slug}${Date.now()}/600/750`, position: 0 }] },
+      variants: { create: [{ size: "One Size", color: "Default", stock }] },
     },
   });
 

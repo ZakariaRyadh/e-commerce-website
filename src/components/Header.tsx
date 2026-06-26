@@ -28,7 +28,7 @@ export function Header() {
           <Link href="/products" className="text-sm text-[#666] hover:text-[#111]">
             Shop
           </Link>
-          <Link href="/products" className="text-sm text-[#666] hover:text-[#111]">
+          <Link href="/collections" className="text-sm text-[#666] hover:text-[#111]">
             Collections
           </Link>
         </nav>
@@ -117,7 +117,7 @@ export function Header() {
           <Link href="/products" onClick={() => setMobileOpen(false)} className="py-2.5 text-sm text-[#333]">
             Shop
           </Link>
-          <Link href="/products" onClick={() => setMobileOpen(false)} className="py-2.5 text-sm text-[#333]">
+          <Link href="/collections" onClick={() => setMobileOpen(false)} className="py-2.5 text-sm text-[#333]">
             Collections
           </Link>
           <div className="h-px bg-[#f0f0f0] my-2" />

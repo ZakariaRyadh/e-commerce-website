@@ -19,16 +19,18 @@ export function ProductListing({
   initialProducts,
   initialQuery,
   initialCategory,
+  initialSort,
 }: {
   categories: Category[];
   initialProducts: Product[];
   initialQuery: string;
   initialCategory?: string;
+  initialSort?: string;
 }) {
   const [filterCat, setFilterCat] = useState(initialCategory ?? "all");
   const [maxPrice, setMaxPrice] = useState(300);
   const [minRating, setMinRating] = useState(0);
-  const [sortBy, setSortBy] = useState("popular");
+  const [sortBy, setSortBy] = useState(initialSort ?? "popular");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const filtered = useMemo(() => {

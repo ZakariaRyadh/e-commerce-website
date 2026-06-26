@@ -17,6 +17,8 @@ type Review = {
   user: { firstName: string; lastName: string };
 };
 
+type Variant = { size: string; color: string; stock: number };
+
 type ProductDetailData = {
   id: string;
   slug: string;
@@ -25,9 +27,11 @@ type ProductDetailData = {
   price: number;
   compareAtPrice: number | null;
   stockStatus: "IN_STOCK" | "LOW_STOCK" | "SOLD_OUT";
+  totalStock: number;
   badge: string | null;
   colors: string[];
   sizes: string[];
+  variants: Variant[];
   category: { name: string };
   images: { url: string }[];
   reviews: Review[];
@@ -52,9 +56,10 @@ export function ProductDetail({
   product: ProductDetailData;
   related: { id: string; slug: string; name: string; price: number; images: { url: string }[]; category: { name: string } }[];
 }) {
+  const firstInStock = product.variants.find((v) => v.stock > 0) ?? product.variants[0];
   const [imgIdx, setImgIdx] = useState(0);
-  const [selSize, setSelSize] = useState(product.sizes[0] ?? "");
-  const [selColor, setSelColor] = useState(product.colors[0] ?? "");
+  const [selSize, setSelSize] = useState(firstInStock?.size ?? product.sizes[0] ?? "");
+  const [selColor, setSelColor] = useState(firstInStock?.color ?? product.colors[0] ?? "");
   const [tab, setTab] = useState<"description" | "specs" | "reviews">("description");
 
   const { addItem } = useCartStore();
@@ -62,16 +67,31 @@ export function ProductDetail({
   const { ids, toggle } = useWishlistStore();
   const wishlisted = ids.includes(product.id);
 
+  const selectedVariant = product.variants.find((v) => v.size === selSize && v.color === selColor);
+  const variantStock = selectedVariant?.stock ?? 0;
+  const variantStockStatus: "IN_STOCK" | "LOW_STOCK" | "SOLD_OUT" =
+    variantStock === 0 ? "SOLD_OUT" : variantStock <= 3 ? "LOW_STOCK" : "IN_STOCK";
+
+  const sizesWithStock = new Set(product.variants.filter((v) => v.stock > 0).map((v) => v.size));
+  const colorsForSelectedSize = product.variants.filter((v) => v.size === selSize);
+
+  function selectSize(size: string) {
+    setSelSize(size);
+    const stillValid = product.variants.find((v) => v.size === size && v.color === selColor);
+    if (!stillValid || stillValid.stock === 0) {
+      const fallback = product.variants.find((v) => v.size === size && v.stock > 0) ?? product.variants.find((v) => v.size === size);
+      if (fallback) setSelColor(fallback.color);
+    }
+  }
+
   const price = product.price;
   const compareAt = product.compareAtPrice;
   const discount = compareAt ? Math.round((1 - price / compareAt) * 100) : null;
-  const stock = stockMeta(product.stockStatus);
+  const stock = stockMeta(variantStockStatus);
   const bc = badgeMeta(product.badge);
 
   const avgRating =
-    product.reviews.length > 0
-      ? product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length
-      : 4.3;
+    product.reviews.length > 0 ? product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length : 0;
 
   function handleAddToCart() {
     addItem({
@@ -156,30 +176,37 @@ export function ProductDetail({
             </span>
           </div>
 
-          {product.colors.length > 0 && (
+          {product.colors.length > 1 && (
             <div>
               <div className="text-sm font-medium mb-3">
                 Color: <span className="font-normal text-[#777]">{selColor}</span>
               </div>
               <div className="flex gap-2 flex-wrap">
-                {product.colors.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setSelColor(c)}
-                    className="w-7 h-7 rounded-full cursor-pointer shrink-0"
-                    style={{
-                      background: colorSwatch(c),
-                      border: `2.5px solid ${c === selColor ? "#fff" : "transparent"}`,
-                      boxShadow: c === selColor ? "0 0 0 2.5px #1B4FD8" : "none",
-                    }}
-                    aria-label={c}
-                  />
-                ))}
+                {product.colors.map((c) => {
+                  const combo = colorsForSelectedSize.find((v) => v.color === c);
+                  const outOfStock = !combo || combo.stock === 0;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => !outOfStock && setSelColor(c)}
+                      disabled={outOfStock}
+                      className="relative w-7 h-7 rounded-full cursor-pointer shrink-0 disabled:cursor-not-allowed"
+                      style={{
+                        background: colorSwatch(c),
+                        border: `2.5px solid ${c === selColor ? "#fff" : "transparent"}`,
+                        boxShadow: c === selColor ? "0 0 0 2.5px #1B4FD8" : "none",
+                        opacity: outOfStock ? 0.3 : 1,
+                      }}
+                      aria-label={outOfStock ? `${c} (out of stock)` : c}
+                      title={outOfStock ? `${c} — out of stock` : c}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {product.sizes.length > 0 && (
+          {product.sizes.length > 1 && (
             <div>
               <div className="flex justify-between items-center mb-3">
                 <span className="text-sm font-medium">
@@ -188,28 +215,36 @@ export function ProductDetail({
                 <button className="text-[13px] text-[#1B4FD8] font-medium cursor-pointer">Size guide →</button>
               </div>
               <div className="flex gap-2 flex-wrap">
-                {product.sizes.map((sz) => (
-                  <button
-                    key={sz}
-                    onClick={() => setSelSize(sz)}
-                    className={`h-10 min-w-12 px-3.5 rounded-lg text-sm font-medium cursor-pointer border-[1.5px] ${
-                      sz === selSize ? "bg-[#111] text-white border-[#111]" : "bg-white text-[#333] border-[#e5e5e5]"
-                    }`}
-                  >
-                    {sz}
-                  </button>
-                ))}
+                {product.sizes.map((sz) => {
+                  const outOfStock = !sizesWithStock.has(sz);
+                  return (
+                    <button
+                      key={sz}
+                      onClick={() => selectSize(sz)}
+                      className={`h-10 min-w-12 px-3.5 rounded-lg text-sm font-medium cursor-pointer border-[1.5px] ${
+                        sz === selSize ? "bg-[#111] text-white border-[#111]" : "bg-white text-[#333] border-[#e5e5e5]"
+                      } ${outOfStock ? "opacity-40" : ""}`}
+                      title={outOfStock ? `${sz} — out of stock` : sz}
+                    >
+                      {sz}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+          )}
+
+          {variantStock > 0 && variantStock <= 3 && (
+            <p className="text-[13px] text-amber-600 font-medium -mt-1">Only {variantStock} left in this size/color</p>
           )}
 
           <div className="flex gap-3 pt-1">
             <button
               onClick={handleAddToCart}
-              disabled={product.stockStatus === "SOLD_OUT"}
+              disabled={variantStock === 0}
               className="flex-1 h-13.5 bg-[#111] text-white rounded-xl text-[15px] font-semibold cursor-pointer hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {product.stockStatus === "SOLD_OUT" ? "Sold Out" : "Add to Cart"}
+              {variantStock === 0 ? "Sold Out" : "Add to Cart"}
             </button>
             <button
               onClick={() => toggle(product.id)}

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, Upload } from "lucide-react";
+import { Search, X, Upload, Boxes } from "lucide-react";
 import { money, stockMeta } from "@/lib/format";
+import { AdminVariantManager } from "@/components/AdminVariantManager";
 
 type Product = {
   id: string;
@@ -12,8 +13,9 @@ type Product = {
   compareAtPrice: number | null;
   description: string;
   categoryId: string;
-  stock: number;
+  totalStock: number;
   stockStatus: "IN_STOCK" | "LOW_STOCK" | "SOLD_OUT";
+  variantCount: number;
   category: string;
   imgUrl: string;
 };
@@ -42,6 +44,7 @@ export function AdminProductsClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [managingStockFor, setManagingStockFor] = useState<Product | null>(null);
 
   const filtered = initialProducts.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -59,7 +62,7 @@ export function AdminProductsClient({
       compareAtPrice: p.compareAtPrice ? String(p.compareAtPrice) : "",
       categoryId: p.categoryId,
       description: p.description,
-      stock: String(p.stock),
+      stock: "10",
     });
     setShowForm(true);
   }
@@ -67,26 +70,31 @@ export function AdminProductsClient({
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const payload = {
-      name: form.name,
-      price: parseFloat(form.price),
-      compareAtPrice: form.compareAtPrice ? parseFloat(form.compareAtPrice) : null,
-      categoryId: form.categoryId,
-      description: form.description || "A thoughtfully crafted essential.",
-      stock: parseInt(form.stock, 10) || 0,
-    };
 
     if (editingId) {
       await fetch(`/api/admin/products/${editingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          name: form.name,
+          price: parseFloat(form.price),
+          compareAtPrice: form.compareAtPrice ? parseFloat(form.compareAtPrice) : null,
+          categoryId: form.categoryId,
+          description: form.description || "A thoughtfully crafted essential.",
+        }),
       });
     } else {
       await fetch("/api/admin/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          name: form.name,
+          price: parseFloat(form.price),
+          compareAtPrice: form.compareAtPrice ? parseFloat(form.compareAtPrice) : null,
+          categoryId: form.categoryId,
+          description: form.description || "A thoughtfully crafted essential.",
+          stock: parseInt(form.stock, 10) || 0,
+        }),
       });
     }
 
@@ -127,7 +135,7 @@ export function AdminProductsClient({
 
       <div className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[640px]">
+          <table className="w-full border-collapse min-w-[720px]">
             <thead>
               <tr className="bg-[#fafafa] border-b border-[#e5e5e5]">
                 <Th>Product</Th>
@@ -156,15 +164,23 @@ export function AdminProductsClient({
                     <td className="px-5 py-3 text-[13px] text-[#555]">{p.category}</td>
                     <td className="px-5 py-3 text-sm font-semibold">{money(p.price)}</td>
                     <td className="px-5 py-3">
-                      <span
-                        className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+                      <button
+                        onClick={() => setManagingStockFor(p)}
+                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium cursor-pointer hover:opacity-80"
                         style={{ background: sm.bg, color: sm.color }}
+                        title="Manage stock"
                       >
-                        {sm.label}
-                      </span>
+                        {sm.label} ({p.totalStock})
+                      </button>
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => setManagingStockFor(p)}
+                          className="h-8 px-3 bg-[#eff6ff] text-[#1B4FD8] rounded-md text-xs font-medium cursor-pointer hover:bg-[#dbeafe] flex items-center gap-1"
+                        >
+                          <Boxes size={12} /> Stock
+                        </button>
                         <button
                           onClick={() => openEdit(p)}
                           className="h-8 px-3 bg-[#f5f5f4] text-[#555] rounded-md text-xs font-medium cursor-pointer hover:bg-[#e5e5e4] hover:text-[#111]"
@@ -257,17 +273,25 @@ export function AdminProductsClient({
                     ))}
                   </select>
                 </Field>
-                <Field label="Stock">
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                    placeholder="10"
-                    className="h-11 px-3.5 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8]"
-                  />
-                </Field>
+                {!editingId && (
+                  <Field label="Initial stock">
+                    <input
+                      type="number"
+                      min="0"
+                      value={form.stock}
+                      onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                      placeholder="10"
+                      className="h-11 px-3.5 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8]"
+                    />
+                  </Field>
+                )}
               </div>
+              {!editingId && (
+                <p className="text-xs text-[#aaa] -mt-1">
+                  Creates a single &quot;One Size&quot; variant with this stock. Add real sizes/colors afterward via the
+                  Stock manager.
+                </p>
+              )}
               <Field label="Description">
                 <textarea
                   rows={3}
@@ -296,6 +320,14 @@ export function AdminProductsClient({
             </div>
           </form>
         </div>
+      )}
+
+      {managingStockFor && (
+        <AdminVariantManager
+          productId={managingStockFor.id}
+          productName={managingStockFor.name}
+          onClose={() => setManagingStockFor(null)}
+        />
       )}
     </div>
   );

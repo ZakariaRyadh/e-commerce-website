@@ -12,6 +12,7 @@ export type ProductCardData = {
   price: number | string;
   compareAtPrice?: number | string | null;
   badge?: string | null;
+  stockStatus?: "IN_STOCK" | "LOW_STOCK" | "SOLD_OUT";
   category: { name: string };
   images: { url: string }[];
   avgRating?: number;
@@ -22,7 +23,8 @@ export function ProductCard({ product }: { product: ProductCardData }) {
   const { ids, toggle } = useWishlistStore();
   const wishlisted = ids.includes(product.id);
   const bc = badgeMeta(product.badge);
-  const rating = product.avgRating ?? 4.3;
+  const rating = product.avgRating ?? 0;
+  const soldOut = product.stockStatus === "SOLD_OUT";
   const stars = [1, 2, 3, 4, 5];
 
   return (
@@ -31,7 +33,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
         <img
           src={product.images[0]?.url}
           alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${soldOut ? "opacity-50" : ""}`}
         />
         <button
           onClick={(e) => {
@@ -43,13 +45,20 @@ export function ProductCard({ product }: { product: ProductCardData }) {
         >
           <Heart size={14} fill={wishlisted ? "#ef4444" : "none"} stroke={wishlisted ? "#ef4444" : "#555"} strokeWidth={2} />
         </button>
-        {bc && product.badge && (
-          <span
-            className="absolute top-2.5 left-2.5 px-1.5 py-0.5 rounded text-[10px] font-semibold"
-            style={{ background: bc.bg, color: bc.color }}
-          >
-            {product.badge}
+        {soldOut ? (
+          <span className="absolute top-2.5 left-2.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#f5f5f4] text-[#555]">
+            Sold Out
           </span>
+        ) : (
+          bc &&
+          product.badge && (
+            <span
+              className="absolute top-2.5 left-2.5 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+              style={{ background: bc.bg, color: bc.color }}
+            >
+              {product.badge}
+            </span>
+          )
         )}
       </div>
       <span className="text-[11px] text-[#aaa] uppercase tracking-wider">{product.category.name}</span>

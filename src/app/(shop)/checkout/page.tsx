@@ -74,7 +74,8 @@ export default function CheckoutPage() {
     });
 
     if (!res.ok) {
-      setError("Could not place order. Please try again.");
+      const j = await res.json().catch(() => ({}));
+      setError(j.error ?? "Could not place order. Please try again.");
       setPlacing(false);
       return;
     }

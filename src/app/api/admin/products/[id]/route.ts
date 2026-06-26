@@ -14,7 +14,6 @@ const updateSchema = z.object({
   compareAtPrice: z.number().positive().nullable().optional(),
   categoryId: z.string().optional(),
   description: z.string().min(1).optional(),
-  stock: z.number().int().min(0).optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -24,21 +23,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const data = parsed.data;
-  const stockStatus =
-    data.stock !== undefined
-      ? data.stock === 0
-        ? "SOLD_OUT"
-        : data.stock <= 5
-          ? "LOW_STOCK"
-          : "IN_STOCK"
-      : undefined;
-
-  const product = await prisma.product.update({
-    where: { id },
-    data: { ...data, ...(stockStatus ? { stockStatus } : {}) },
-  });
-
+  const product = await prisma.product.update({ where: { id }, data: parsed.data });
   return NextResponse.json(product);
 }
 

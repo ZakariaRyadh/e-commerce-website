@@ -36,31 +36,57 @@ export async function POST(req: Request) {
 
   const { items, subtotal, shipping, tax, total, promoCode, shippingAddress } = parsed.data;
 
-  const order = await prisma.order.create({
-    data: {
-      userId: session.user.id,
-      subtotal,
-      shipping,
-      tax,
-      total,
-      promoCode,
-      shippingAddress,
-      status: "PROCESSING",
-      items: {
-        create: items.map((i) => ({
-          productId: i.productId,
-          name: i.name,
-          price: i.price,
-          qty: i.qty,
-          size: i.size,
-          color: i.color,
-        })),
-      },
-    },
-    include: { items: true },
-  });
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const variant = await tx.productVariant.findFirst({
+          where: { productId: item.productId, size: item.size ?? undefined, color: item.color ?? undefined },
+        });
+        if (!variant || variant.stock < item.qty) {
+          throw new Error(`INSUFFICIENT_STOCK:${item.name}`);
+        }
+      }
 
-  return NextResponse.json(order);
+      for (const item of items) {
+        await tx.productVariant.updateMany({
+          where: { productId: item.productId, size: item.size ?? undefined, color: item.color ?? undefined },
+          data: { stock: { decrement: item.qty } },
+        });
+      }
+
+      return tx.order.create({
+        data: {
+          userId: session.user.id,
+          subtotal,
+          shipping,
+          tax,
+          total,
+          promoCode,
+          shippingAddress,
+          status: "PROCESSING",
+          items: {
+            create: items.map((i) => ({
+              productId: i.productId,
+              name: i.name,
+              price: i.price,
+              qty: i.qty,
+              size: i.size,
+              color: i.color,
+            })),
+          },
+        },
+        include: { items: true },
+      });
+    });
+
+    return NextResponse.json(order);
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("INSUFFICIENT_STOCK:")) {
+      const productName = e.message.split(":")[1];
+      return NextResponse.json({ error: `Not enough stock for "${productName}" in that size/color.` }, { status: 409 });
+    }
+    return NextResponse.json({ error: "Could not place order." }, { status: 500 });
+  }
 }
 
 export async function GET() {
