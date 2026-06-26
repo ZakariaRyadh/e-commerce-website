@@ -14,6 +14,10 @@ type Product = {
   compareAtPrice: number | null;
   description: string;
   categoryId: string;
+  material: string | null;
+  fit: string | null;
+  care: string | null;
+  origin: string | null;
   totalStock: number;
   stockStatus: "IN_STOCK" | "LOW_STOCK" | "SOLD_OUT";
   variantCount: number;
@@ -30,6 +34,10 @@ const emptyForm = {
   categoryId: "",
   description: "",
   stock: "10",
+  material: "",
+  fit: "",
+  care: "",
+  origin: "",
 };
 
 export function AdminProductsClient({
@@ -65,6 +73,10 @@ export function AdminProductsClient({
       categoryId: p.categoryId,
       description: p.description,
       stock: "10",
+      material: p.material ?? "",
+      fit: p.fit ?? "",
+      care: p.care ?? "",
+      origin: p.origin ?? "",
     });
     setShowForm(true);
   }
@@ -72,6 +84,13 @@ export function AdminProductsClient({
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+
+    const specs = {
+      material: form.material || undefined,
+      fit: form.fit || undefined,
+      care: form.care || undefined,
+      origin: form.origin || undefined,
+    };
 
     if (editingId) {
       await fetch(`/api/admin/products/${editingId}`, {
@@ -83,6 +102,7 @@ export function AdminProductsClient({
           compareAtPrice: form.compareAtPrice ? parseFloat(form.compareAtPrice) : null,
           categoryId: form.categoryId,
           description: form.description || "A thoughtfully crafted essential.",
+          ...specs,
         }),
       });
     } else {
@@ -96,6 +116,7 @@ export function AdminProductsClient({
           categoryId: form.categoryId,
           description: form.description || "A thoughtfully crafted essential.",
           stock: parseInt(form.stock, 10) || 0,
+          ...specs,
         }),
       });
     }
@@ -309,6 +330,47 @@ export function AdminProductsClient({
                   className="px-3.5 py-3 border border-[#e5e5e5] rounded-lg text-sm outline-none resize-vertical focus:border-[#1B4FD8]"
                 />
               </Field>
+
+              <div className="border-t border-[#f0f0f0] pt-4 mt-1">
+                <p className="text-[13px] font-semibold mb-3">Specifications (shown on product page)</p>
+                <div className="flex flex-col gap-3">
+                  <Field label="Material">
+                    <input
+                      value={form.material}
+                      onChange={(e) => setForm({ ...form, material: e.target.value })}
+                      placeholder="e.g. 100% Premium Cotton"
+                      className="h-11 px-3.5 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8]"
+                    />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Fit">
+                      <input
+                        value={form.fit}
+                        onChange={(e) => setForm({ ...form, fit: e.target.value })}
+                        placeholder="e.g. Regular / Relaxed"
+                        className="h-11 px-3.5 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8]"
+                      />
+                    </Field>
+                    <Field label="Care">
+                      <input
+                        value={form.care}
+                        onChange={(e) => setForm({ ...form, care: e.target.value })}
+                        placeholder="e.g. Machine wash 30°C"
+                        className="h-11 px-3.5 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8]"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Origin">
+                    <input
+                      value={form.origin}
+                      onChange={(e) => setForm({ ...form, origin: e.target.value })}
+                      placeholder="e.g. Made in Portugal"
+                      className="h-11 px-3.5 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8]"
+                    />
+                  </Field>
+                </div>
+              </div>
+
               <div className="flex gap-3 mt-2">
                 <button
                   type="button"

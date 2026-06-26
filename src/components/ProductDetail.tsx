@@ -32,6 +32,10 @@ type ProductDetailData = {
   stockStatus: "IN_STOCK" | "LOW_STOCK" | "SOLD_OUT";
   totalStock: number;
   badge: string | null;
+  material: string | null;
+  fit: string | null;
+  care: string | null;
+  origin: string | null;
   colors: string[];
   sizes: string[];
   variants: Variant[];
@@ -342,17 +346,22 @@ export function ProductDetail({
         {tab === "specs" && (
           <div className="py-10 max-w-[500px]">
             {[
-              { label: "Material", value: "100% Premium Cotton" },
-              { label: "Fit", value: "Regular / Relaxed" },
-              { label: "Care", value: "Machine wash 30°C" },
-              { label: "Origin", value: "Certified facility, Portugal" },
+              { label: "Material", value: product.material },
+              { label: "Fit", value: product.fit },
+              { label: "Care", value: product.care },
+              { label: "Origin", value: product.origin },
               { label: "SKU", value: `LUMA-${product.id.slice(0, 6).toUpperCase()}` },
-            ].map((row) => (
-              <div key={row.label} className="flex border-b border-[#f0f0f0] py-3.5">
-                <span className="w-44 shrink-0 text-sm text-[#aaa]">{row.label}</span>
-                <span className="text-sm font-medium">{row.value}</span>
-              </div>
-            ))}
+            ]
+              .filter((row) => row.value)
+              .map((row) => (
+                <div key={row.label} className="flex border-b border-[#f0f0f0] py-3.5">
+                  <span className="w-44 shrink-0 text-sm text-[#aaa]">{row.label}</span>
+                  <span className="text-sm font-medium">{row.value}</span>
+                </div>
+              ))}
+            {!product.material && !product.fit && !product.care && !product.origin && (
+              <p className="text-sm text-[#aaa]">No specifications provided for this product yet.</p>
+            )}
           </div>
         )}
 

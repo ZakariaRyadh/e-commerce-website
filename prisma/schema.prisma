@@ -88,6 +88,10 @@ model Product {
   price         Decimal     @db.Decimal(10, 2)
   compareAtPrice Decimal?   @db.Decimal(10, 2)
   badge         String?
+  material      String?
+  fit           String?
+  care          String?
+  origin        String?
   createdAt     DateTime    @default(now())
 
   categoryId String

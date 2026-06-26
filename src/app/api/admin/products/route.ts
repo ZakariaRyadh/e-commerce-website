@@ -10,6 +10,10 @@ const productSchema = z.object({
   categoryId: z.string(),
   description: z.string().min(1),
   stock: z.number().int().min(0).default(10),
+  material: z.string().optional(),
+  fit: z.string().optional(),
+  care: z.string().optional(),
+  origin: z.string().optional(),
 });
 
 async function requireAdmin() {
@@ -39,7 +43,7 @@ export async function POST(req: Request) {
   const parsed = productSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { name, price, compareAtPrice, categoryId, description, stock } = parsed.data;
+  const { name, price, compareAtPrice, categoryId, description, stock, material, fit, care, origin } = parsed.data;
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -56,6 +60,10 @@ export async function POST(req: Request) {
       price,
       compareAtPrice,
       categoryId,
+      material,
+      fit,
+      care,
+      origin,
       images: { create: [{ url: `https://picsum.photos/seed/${slug}${Date.now()}/600/750`, position: 0 }] },
       variants: { create: [{ size: "One Size", color: "Default", stock }] },
     },

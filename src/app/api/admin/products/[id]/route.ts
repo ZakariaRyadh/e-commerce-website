@@ -14,6 +14,10 @@ const updateSchema = z.object({
   compareAtPrice: z.number().positive().nullable().optional(),
   categoryId: z.string().optional(),
   description: z.string().min(1).optional(),
+  material: z.string().optional(),
+  fit: z.string().optional(),
+  care: z.string().optional(),
+  origin: z.string().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
