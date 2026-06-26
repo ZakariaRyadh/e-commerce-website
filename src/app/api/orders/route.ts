@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { sendOrderConfirmationEmail } from "@/lib/email";
 
 const orderSchema = z.object({
   items: z.array(
@@ -77,6 +78,14 @@ export async function POST(req: Request) {
         },
         include: { items: true },
       });
+    });
+
+    await sendOrderConfirmationEmail({
+      to: session.user.email!,
+      customerName: session.user.name ?? "there",
+      orderId: order.id,
+      total: total.toFixed(2),
+      items: order.items,
     });
 
     return NextResponse.json(order);

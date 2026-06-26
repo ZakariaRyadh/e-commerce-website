@@ -1,33 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-export default function LoginPage() {
+export default function ForgotPasswordPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setLoading(true);
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
+    setError(null);
+
+    const res = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
     });
+
     setLoading(false);
-    if (res?.error) {
-      setError("Invalid email or password.");
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setError(j.error ?? "Something went wrong.");
       return;
     }
-    router.push("/account");
-    router.refresh();
+
+    router.push(`/reset-password?email=${encodeURIComponent(email)}`);
   }
 
   return (
@@ -37,8 +38,8 @@ export default function LoginPage() {
           LUMA
         </Link>
         <div className="flex flex-col gap-2 text-center">
-          <h1 className="text-[26px] font-bold tracking-tight">Welcome back</h1>
-          <p className="text-[14px] text-[#888]">Log in to your account to continue.</p>
+          <h1 className="text-[26px] font-bold tracking-tight">Forgot your password?</h1>
+          <p className="text-[14px] text-[#888]">Enter your email and we&apos;ll send you a reset code.</p>
         </div>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -52,35 +53,19 @@ export default function LoginPage() {
               className="h-11 px-3.5 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8] focus:ring-3 focus:ring-[#1B4FD8]/10"
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[13px] font-medium text-[#555]">Password</label>
-              <Link href="/forgot-password" className="text-[13px] text-[#1B4FD8] font-medium">
-                Forgot password?
-              </Link>
-            </div>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="h-11 px-3.5 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8] focus:ring-3 focus:ring-[#1B4FD8]/10"
-            />
-          </div>
           {error && <p className="text-[13px] text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={loading}
             className="h-12 bg-[#111] text-white rounded-xl text-[15px] font-semibold cursor-pointer hover:bg-[#333] disabled:opacity-60"
           >
-            {loading ? "Logging in…" : "Log In"}
+            {loading ? "Sending…" : "Send Reset Code"}
           </button>
         </form>
         <p className="text-[14px] text-[#888] text-center">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-[#1B4FD8] font-medium">
-            Sign up
+          Remembered it?{" "}
+          <Link href="/login" className="text-[#1B4FD8] font-medium">
+            Log in
           </Link>
         </p>
       </div>

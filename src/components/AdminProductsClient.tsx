@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, Upload, Boxes } from "lucide-react";
+import { Search, X, Upload, Boxes, ImageIcon } from "lucide-react";
 import { money, stockMeta } from "@/lib/format";
 import { AdminVariantManager } from "@/components/AdminVariantManager";
+import { AdminImageManager } from "@/components/AdminImageManager";
 
 type Product = {
   id: string;
@@ -45,6 +46,7 @@ export function AdminProductsClient({
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [managingStockFor, setManagingStockFor] = useState<Product | null>(null);
+  const [managingImagesFor, setManagingImagesFor] = useState<Product | null>(null);
 
   const filtered = initialProducts.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -180,6 +182,12 @@ export function AdminProductsClient({
                           className="h-8 px-3 bg-[#eff6ff] text-[#1B4FD8] rounded-md text-xs font-medium cursor-pointer hover:bg-[#dbeafe] flex items-center gap-1"
                         >
                           <Boxes size={12} /> Stock
+                        </button>
+                        <button
+                          onClick={() => setManagingImagesFor(p)}
+                          className="h-8 px-3 bg-[#f0fdf4] text-green-700 rounded-md text-xs font-medium cursor-pointer hover:bg-green-100 flex items-center gap-1"
+                        >
+                          <ImageIcon size={12} /> Images
                         </button>
                         <button
                           onClick={() => openEdit(p)}
@@ -327,6 +335,14 @@ export function AdminProductsClient({
           productId={managingStockFor.id}
           productName={managingStockFor.name}
           onClose={() => setManagingStockFor(null)}
+        />
+      )}
+
+      {managingImagesFor && (
+        <AdminImageManager
+          productId={managingImagesFor.id}
+          productName={managingImagesFor.name}
+          onClose={() => setManagingImagesFor(null)}
         />
       )}
     </div>

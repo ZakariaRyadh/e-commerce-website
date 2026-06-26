@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Heart, Truck, RotateCcw } from "lucide-react";
 import { money, stockMeta, badgeMeta, colorSwatch } from "@/lib/format";
 import { useCartStore, useUiStore, useWishlistStore } from "@/lib/store";
@@ -9,6 +11,7 @@ import { ProductCard } from "@/components/ProductCard";
 
 type Review = {
   id: string;
+  userId: string;
   rating: number;
   title: string;
   text: string;
@@ -56,16 +59,51 @@ export function ProductDetail({
   product: ProductDetailData;
   related: { id: string; slug: string; name: string; price: number; images: { url: string }[]; category: { name: string } }[];
 }) {
+  const router = useRouter();
+  const { data: session } = useSession();
   const firstInStock = product.variants.find((v) => v.stock > 0) ?? product.variants[0];
   const [imgIdx, setImgIdx] = useState(0);
   const [selSize, setSelSize] = useState(firstInStock?.size ?? product.sizes[0] ?? "");
   const [selColor, setSelColor] = useState(firstInStock?.color ?? product.colors[0] ?? "");
   const [tab, setTab] = useState<"description" | "specs" | "reviews">("description");
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewText, setReviewText] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const { addItem } = useCartStore();
   const { openCart } = useUiStore();
   const { ids, toggle } = useWishlistStore();
   const wishlisted = ids.includes(product.id);
+
+  const hasUserReviewed = session?.user && product.reviews.some((r) => r.userId === session.user.id);
+
+  async function submitReview(e: React.FormEvent) {
+    e.preventDefault();
+    setReviewSubmitting(true);
+    setReviewError(null);
+
+    const res = await fetch("/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId: product.id, rating: reviewRating, title: reviewTitle, text: reviewText }),
+    });
+
+    setReviewSubmitting(false);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setReviewError(j.error ?? "Could not submit review.");
+      return;
+    }
+
+    setShowReviewForm(false);
+    setReviewTitle("");
+    setReviewText("");
+    setReviewRating(5);
+    router.refresh();
+  }
 
   const selectedVariant = product.variants.find((v) => v.size === selSize && v.color === selColor);
   const variantStock = selectedVariant?.stock ?? 0;
@@ -328,7 +366,87 @@ export function ProductDetail({
                 </div>
                 <div className="text-[13px] text-[#aaa]">{product.reviews.length} reviews</div>
               </div>
+
+              <div className="flex-1 min-w-[200px]">
+                {!session ? (
+                  <p className="text-sm text-[#aaa]">
+                    <Link href="/login" className="text-[#1B4FD8] font-medium">
+                      Log in
+                    </Link>{" "}
+                    to write a review.
+                  </p>
+                ) : hasUserReviewed ? (
+                  <p className="text-sm text-[#aaa]">You&apos;ve already reviewed this product. Thanks!</p>
+                ) : !showReviewForm ? (
+                  <button
+                    onClick={() => setShowReviewForm(true)}
+                    className="h-10 px-4 bg-[#111] text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-[#333]"
+                  >
+                    Write a Review
+                  </button>
+                ) : null}
+              </div>
             </div>
+
+            {showReviewForm && (
+              <form onSubmit={submitReview} className="py-7 border-b border-[#e8e8e7] flex flex-col gap-3.5 max-w-[480px]">
+                <div>
+                  <div className="text-sm font-medium mb-2">Your rating</div>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setReviewRating(s)}
+                        className="cursor-pointer text-2xl"
+                        style={{ color: s <= reviewRating ? "#f59e0b" : "#e0e0e0" }}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-medium text-[#555]">Title</label>
+                  <input
+                    required
+                    value={reviewTitle}
+                    onChange={(e) => setReviewTitle(e.target.value)}
+                    placeholder="Sum up your experience"
+                    className="h-10 px-3 border border-[#e5e5e5] rounded-lg text-sm outline-none focus:border-[#1B4FD8]"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-medium text-[#555]">Review</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    placeholder="What did you like or dislike?"
+                    className="px-3 py-2.5 border border-[#e5e5e5] rounded-lg text-sm outline-none resize-vertical focus:border-[#1B4FD8]"
+                  />
+                </div>
+                {reviewError && <p className="text-[13px] text-red-600">{reviewError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewForm(false)}
+                    className="h-10 px-4 bg-[#f5f5f4] text-[#555] rounded-lg text-sm font-medium cursor-pointer hover:bg-[#e5e5e4]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={reviewSubmitting}
+                    className="h-10 px-4 bg-[#111] text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-[#333] disabled:opacity-60"
+                  >
+                    {reviewSubmitting ? "Submitting…" : "Submit Review"}
+                  </button>
+                </div>
+              </form>
+            )}
+
             {product.reviews.length === 0 ? (
               <p className="py-8 text-sm text-[#aaa]">No reviews yet. Be the first to review this product.</p>
             ) : (
